@@ -1,0 +1,177 @@
+import { StyleSheet } from "react-native";
+
+export const sharedStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#666",
+  },
+  busStopHeader: {
+    backgroundColor: "#1976D2",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  busStopLabel: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "500",
+    marginBottom: 4,
+    opacity: 0.9,
+  },
+  busStopName: {
+    fontSize: 32,
+    color: "#fff",
+    fontWeight: "500",
+    marginBottom: 4,
+    opacity: 0.9,
+    textAlign: "center",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navButton: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#1976D2",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  navButtonText: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#1976D2",
+  },
+  busCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  busHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  busNumber: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#1976D2",
+  },
+  busInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  operator: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  wheelchair: {
+    fontSize: 18,
+  },
+  timingsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  timingBox: {
+    flex: 1,
+    minWidth: 100,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+  },
+  timingText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 6,
+  },
+  loadBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  loadText: {
+    fontSize: 10,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  noTiming: {
+    fontSize: 14,
+    color: "#999",
+    fontStyle: "italic",
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#999",
+  },
+  refreshButton: {
+    backgroundColor: "#1976D2",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  refreshButtonText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
+  },
+});
+
