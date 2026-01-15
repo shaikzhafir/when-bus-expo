@@ -6,6 +6,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="bus-stop-71119" options={{ headerShown: false }} />
         <Stack.Screen name="bus-stop-71201" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>

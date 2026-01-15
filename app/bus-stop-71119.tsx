@@ -8,9 +8,9 @@ import { RefreshButton } from "./components/RefreshButton";
 import { useBusArrivals } from "./hooks/useBusArrivals";
 import { sharedStyles } from "./styles";
 
-export default function BusStop71201() {
-  const busStopCode = "71201";
-  const busStopName = "Paya Ubi Industrial Park (Towards Paya Lebar)";
+export default function BusStop71119() {
+  const busStopCode = "71119";
+  const busStopName = "Opposite Blk 344 (Towards Eunos)";
   const { isLoading, busArrivals, refresh } = useBusArrivals(busStopCode);
   const insets = useSafeAreaInsets();
 
@@ -46,4 +46,3 @@ export default function BusStop71201() {
     </>
   );
 }
-
