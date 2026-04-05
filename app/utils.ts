@@ -1,7 +1,8 @@
 export const formatTime = (minutes: string) => {
-  if (minutes === "0") return "Arriving";
-  if (minutes === "1") return "1 min";
-  return `${minutes} mins`;
+  const mins = parseInt(minutes, 10);
+  if (isNaN(mins) || mins <= 0) return "Arriving";
+  if (mins === 1) return "1 min";
+  return `${mins} mins`;
 };
 
 export const getLoadColor = (load: string) => {
