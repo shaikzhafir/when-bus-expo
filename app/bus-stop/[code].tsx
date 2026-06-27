@@ -1,6 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BusCard } from "../components/BusCard";
 import { FreshnessLine } from "../components/FreshnessLine";
@@ -62,7 +69,14 @@ export default function BusStopDetail() {
             </TouchableOpacity>
           }
         />
-        {lastUpdated && <FreshnessLine updatedAt={lastUpdated} />}
+        {isLoading || isRefreshing ? (
+          <View style={sharedStyles.statusRow}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={sharedStyles.statusText}>Loading arrivals…</Text>
+          </View>
+        ) : lastUpdated ? (
+          <FreshnessLine updatedAt={lastUpdated} />
+        ) : null}
 
         {isLoading ? (
           <>

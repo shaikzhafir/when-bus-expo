@@ -4,6 +4,7 @@ import * as Location from "expo-location";
 import { Stack, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -53,6 +54,11 @@ export default function Index() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [nearestBusStops, setNearestBusStops] = useState<NearestBusStop[]>([]);
   const [isLoadingBusStops, setIsLoadingBusStops] = useState(false);
+  // Which phase of a cold load we're in, so the user knows whether we're
+  // waiting on the device GPS or on the arrivals backend.
+  const [loadingPhase, setLoadingPhase] = useState<
+    "locating" | "fetching" | null
+  >(null);
   const [showMoreBusStops, setShowMoreBusStops] = useState(false);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -91,6 +97,7 @@ export default function Index() {
 
   const fetchNearestBusStops = useCallback(async (lat: number, lng: number) => {
     setIsLoadingBusStops(true);
+    setLoadingPhase("fetching");
     try {
       const response = await fetch(
         `${API_BASE_URL}/getNearestBusStops?lat=${lat}&lng=${lng}`,
@@ -105,6 +112,7 @@ export default function Index() {
       setError("Couldn't load nearby stops. Pull down to retry.");
     } finally {
       setIsLoadingBusStops(false);
+      setLoadingPhase(null);
     }
   }, []);
 
@@ -130,6 +138,7 @@ export default function Index() {
       inFlight.current = true;
       if (mode === "refresh") setIsRefreshing(true);
       else setIsLoading(true);
+      setLoadingPhase("locating");
       setError(null);
 
       const hasPermission = await requestLocationPermission();
@@ -137,6 +146,7 @@ export default function Index() {
         inFlight.current = false;
         setIsLoading(false);
         setIsRefreshing(false);
+        setLoadingPhase(null);
         return;
       }
 
@@ -201,6 +211,7 @@ export default function Index() {
         inFlight.current = false;
         setIsLoading(false);
         setIsRefreshing(false);
+        setLoadingPhase(null);
       }
     },
     [requestLocationPermission, fetchNearestBusStops],
@@ -263,7 +274,17 @@ export default function Index() {
             </TouchableOpacity>
           }
         />
-        {lastUpdated && !permissionDenied && (
+        {!permissionDenied && loadingPhase && (
+          <View style={sharedStyles.statusRow}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={sharedStyles.statusText}>
+              {loadingPhase === "fetching"
+                ? "Loading nearby stops…"
+                : "Finding your location…"}
+            </Text>
+          </View>
+        )}
+        {lastUpdated && !permissionDenied && !loadingPhase && (
           <FreshnessLine updatedAt={lastUpdated} />
         )}
 
@@ -347,11 +368,19 @@ export default function Index() {
         )}
 
         {/* Nearby stops */}
-        {(location || isLoadingBusStops) && !permissionDenied && (
+        {(location || isLoadingBusStops || loadingPhase) && !permissionDenied && (
           <>
             <Text style={sharedStyles.sectionTitle}>Nearby stops</Text>
             {showInitialSkeleton || (isLoadingBusStops && nearestBusStops.length === 0) ? (
               <>
+                <View style={sharedStyles.statusRow}>
+                  <ActivityIndicator size="small" color={colors.accent} />
+                  <Text style={sharedStyles.statusText}>
+                    {loadingPhase === "fetching"
+                      ? "Loading nearby stops…"
+                      : "Finding your location…"}
+                  </Text>
+                </View>
                 <View style={sharedStyles.skeleton} />
                 <View style={sharedStyles.skeleton} />
               </>
