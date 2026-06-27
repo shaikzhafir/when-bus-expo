@@ -13,3 +13,10 @@ export type NearestBusStop = {
   Distance: number;
   Arrivals: BusArrival[];
 };
+
+export type FavouriteStop = {
+  BusStopCode: string;
+  RoadName: string;
+  Description: string;
+  Nickname?: string;
+};

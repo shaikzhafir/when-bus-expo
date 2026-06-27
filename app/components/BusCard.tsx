@@ -1,41 +1,114 @@
-import { View, Text } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { Text, View } from "react-native";
 import { sharedStyles } from "../styles";
-import { formatTime, getLoadColor, getLoadText } from "../utils";
+import { colors } from "../theme";
 import type { BusArrival } from "../types";
+import { getLoadColor, getLoadShort, getLoadText, minutesUntil } from "../utils";
 
 type BusCardProps = {
   arrival: BusArrival;
 };
 
-export function BusCard({ arrival }: BusCardProps) {
+const IMMINENT_MINS = 2;
+
+function LoadIndicator({ load }: { load?: string }) {
+  if (!load) return null;
+  const short = getLoadShort(load);
+  if (!short) return null;
   return (
-    <View style={sharedStyles.busCard}>
-      <View style={sharedStyles.busHeader}>
-        <Text style={sharedStyles.busNumber}>{arrival.ServiceNo}</Text>
-        <View style={sharedStyles.busInfo}>
-          <Text style={sharedStyles.operator}>{arrival.Operator}</Text>
-          {arrival.IsWheelchair && (
-            <Text style={sharedStyles.wheelchair}>♿</Text>
-          )}
-        </View>
-      </View>
-      <View style={sharedStyles.timingsContainer}>
-        {arrival.NextBuses && arrival.NextBuses.length > 0 ? (
-          arrival.NextBuses.map((time, index) => (
-            <View key={index} style={sharedStyles.timingBox}>
-              <Text style={sharedStyles.timingText}>{formatTime(time)}</Text>
-              {arrival.LoadStatus && arrival.LoadStatus[index] && (
-                <View style={[sharedStyles.loadBadge, { backgroundColor: getLoadColor(arrival.LoadStatus[index]) }]}>
-                  <Text style={sharedStyles.loadText}>{getLoadText(arrival.LoadStatus[index])}</Text>
-                </View>
-              )}
-            </View>
-          ))
-        ) : (
-          <Text style={sharedStyles.noTiming}>No upcoming buses</Text>
-        )}
-      </View>
+    <View
+      style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+      accessibilityLabel={getLoadText(load)}
+    >
+      <View style={[sharedStyles.loadDot, { backgroundColor: getLoadColor(load) }]} />
+      <Text style={sharedStyles.loadLabel}>{short}</Text>
     </View>
   );
 }
 
+export function BusCard({ arrival }: BusCardProps) {
+  const times = arrival.NextBuses ?? [];
+  const [next, ...rest] = times;
+  const nextMins = next != null ? minutesUntil(next) : undefined;
+  const imminent = nextMins != null && nextMins <= IMMINENT_MINS;
+
+  const heroSpeech =
+    next == null
+      ? "no upcoming buses"
+      : nextMins == null
+        ? "arriving now"
+        : `${nextMins} ${nextMins === 1 ? "minute" : "minutes"}`;
+
+  return (
+    <View
+      style={sharedStyles.busCard}
+      accessible
+      accessibilityLabel={`Bus ${arrival.ServiceNo}, ${heroSpeech}`}
+    >
+      <View style={sharedStyles.busTopRow}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={sharedStyles.routeBadge}>
+            <Text style={sharedStyles.routeNumber}>{arrival.ServiceNo}</Text>
+          </View>
+          {arrival.IsWheelchair && (
+            <MaterialIcons
+              name="accessible"
+              size={18}
+              color={colors.inkMuted}
+              accessibilityLabel="Wheelchair accessible"
+            />
+          )}
+          {arrival.Operator ? (
+            <Text style={sharedStyles.operator}>{arrival.Operator}</Text>
+          ) : null}
+        </View>
+
+        {next == null ? (
+          <Text style={sharedStyles.noTiming}>No upcoming buses</Text>
+        ) : nextMins == null ? (
+          <Text style={sharedStyles.heroArriving}>Arriving</Text>
+        ) : (
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+            <Text style={[sharedStyles.heroValue, imminent && sharedStyles.heroImminent]}>
+              {nextMins}
+            </Text>
+            <Text style={sharedStyles.heroUnit}>{nextMins === 1 ? "min" : "mins"}</Text>
+          </View>
+        )}
+      </View>
+
+      {(arrival.LoadStatus?.[0] || rest.length > 0) && (
+        <View style={sharedStyles.followRow}>
+          {arrival.LoadStatus?.[0] && <LoadIndicator load={arrival.LoadStatus[0]} />}
+          {rest.map((time, i) => {
+            const mins = minutesUntil(time);
+            const load = arrival.LoadStatus?.[i + 1];
+            const short = load ? getLoadShort(load) : "";
+            return (
+              <View
+                key={i}
+                style={sharedStyles.followChip}
+                accessibilityLabel={
+                  `Then ${mins == null ? "arriving" : `${mins} minutes`}` +
+                  (load ? `, ${getLoadText(load)}` : "")
+                }
+              >
+                <Text style={sharedStyles.followTime}>
+                  {mins == null ? "Arriving" : `${mins} min`}
+                </Text>
+                {load && short ? (
+                  <>
+                    <View
+                      style={[sharedStyles.loadDot, { backgroundColor: getLoadColor(load) }]}
+                    />
+                    <Text style={sharedStyles.loadLabel}>{short}</Text>
+                  </>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}

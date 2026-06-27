@@ -1,177 +1,300 @@
 import { StyleSheet } from "react-native";
+import { colors, radius, space, tabularNums, type } from "./theme";
 
 export const sharedStyles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: colors.bg,
   },
   scrollView: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: colors.bg,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xxl,
+    gap: space.md,
   },
-  loadingText: {
-    fontSize: 16,
-    color: "#666",
-  },
-  busStopHeader: {
-    backgroundColor: "#1976D2",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+
+  // In-app top bar (native header is disabled in _layout)
+  topBar: {
+    flexDirection: "row",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3.84,
-    elevation: 5,
+    gap: space.md,
+    paddingBottom: space.md,
   },
-  busStopLabel: {
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "500",
-    marginBottom: 4,
-    opacity: 0.9,
+  topBarTitleWrap: {
+    flex: 1,
   },
-  busStopName: {
-    fontSize: 32,
-    color: "#fff",
-    fontWeight: "500",
-    marginBottom: 4,
-    opacity: 0.9,
-    textAlign: "center",
+  topBarTitle: {
+    fontSize: type.title,
+    fontWeight: "800",
+    color: colors.ink,
+    letterSpacing: -0.5,
+  },
+  topBarSubtitle: {
+    fontSize: type.label,
+    color: colors.inkMuted,
+    marginTop: 2,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.surfaceSunk,
   },
-  navButton: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+
+  // Freshness line under the title
+  statusRow: {
+    flexDirection: "row",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#1976D2",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    gap: space.sm,
+    marginTop: -space.xs,
   },
-  navButtonText: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "#1976D2",
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.pill,
   },
+  statusText: {
+    fontSize: type.label,
+    color: colors.inkMuted,
+  },
+
+  // Section heading
+  sectionTitle: {
+    fontSize: type.label,
+    fontWeight: "700",
+    color: colors.inkMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginTop: space.sm,
+  },
+
+  // Stop block (no card chrome on the stop itself; spacing groups it)
+  stopBlock: {
+    gap: space.sm,
+  },
+  stopHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: space.md,
+  },
+  stopName: {
+    flex: 1,
+    fontSize: type.lg,
+    fontWeight: "700",
+    color: colors.ink,
+  },
+  stopMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  stopMeta: {
+    fontSize: type.label,
+    color: colors.inkMuted,
+  },
+
+  // Bus arrival card — the answer surface
   busCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: space.lg,
+    gap: space.md,
   },
-  busHeader: {
+  busTopRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
+    gap: space.md,
+  },
+  routeBadge: {
+    backgroundColor: colors.surfaceSunk,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    minWidth: 56,
     alignItems: "center",
-    marginBottom: 12,
   },
-  busNumber: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#1976D2",
+  routeNumber: {
+    fontSize: type.lg,
+    fontWeight: "800",
+    color: colors.ink,
+    ...tabularNums,
   },
-  busInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  // The hero: next arrival
+  heroValue: {
+    fontSize: type.hero,
+    fontWeight: "800",
+    color: colors.ink,
+    letterSpacing: -1.5,
+    ...tabularNums,
   },
-  operator: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
+  heroUnit: {
+    fontSize: type.body,
+    fontWeight: "600",
+    color: colors.inkMuted,
   },
-  wheelchair: {
-    fontSize: 18,
+  heroArriving: {
+    fontSize: type.title,
+    fontWeight: "800",
+    color: colors.accentText,
+    letterSpacing: -0.5,
   },
-  timingsContainer: {
+
+  // Following arrivals row
+  followRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: space.sm,
   },
-  timingBox: {
-    flex: 1,
-    minWidth: 100,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    padding: 12,
+  followChip: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: space.xs,
+    backgroundColor: colors.surfaceSunk,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
   },
-  timingText: {
-    fontSize: 18,
+  followTime: {
+    fontSize: type.body,
+    fontWeight: "700",
+    color: colors.ink,
+    ...tabularNums,
+  },
+  loadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.pill,
+  },
+  loadLabel: {
+    fontSize: type.caption,
+    color: colors.inkMuted,
+  },
+  operator: {
+    fontSize: type.caption,
+    color: colors.inkMuted,
     fontWeight: "600",
-    color: "#333",
-    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  loadBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  loadText: {
-    fontSize: 10,
-    color: "#fff",
-    fontWeight: "600",
+  heroImminent: {
+    color: colors.accentText,
   },
   noTiming: {
-    fontSize: 14,
-    color: "#999",
+    fontSize: type.body,
+    color: colors.inkMuted,
     fontStyle: "italic",
   },
-  emptyContainer: {
-    padding: 32,
+
+  // Primary / secondary buttons
+  primaryButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    paddingVertical: space.lg,
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: space.sm,
+    minHeight: 52,
   },
-  emptyText: {
-    fontSize: 16,
-    color: "#999",
+  primaryButtonText: {
+    fontSize: type.lg,
+    fontWeight: "700",
+    color: colors.onAccent,
   },
-  refreshButton: {
-    backgroundColor: "#1976D2",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+  textButton: {
+    flexDirection: "row",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3.84,
-    elevation: 5,
+    gap: space.xs,
+    paddingVertical: space.sm,
   },
-  refreshButtonText: {
-    fontSize: 18,
+  textButtonLabel: {
+    fontSize: type.body,
     fontWeight: "600",
-    color: "#fff",
+    color: colors.accentText,
+  },
+
+  // States
+  stateContainer: {
+    paddingVertical: space.xxl,
+    alignItems: "center",
+    gap: space.md,
+  },
+  stateText: {
+    fontSize: type.body,
+    color: colors.inkMuted,
+    textAlign: "center",
+  },
+  stateTextError: {
+    fontSize: type.body,
+    color: colors.loadLimited,
+    textAlign: "center",
+  },
+
+  // Loading skeleton block
+  skeleton: {
+    backgroundColor: colors.surfaceSunk,
+    borderRadius: radius.md,
+    height: 96,
+  },
+
+  // Favourite stop row (home)
+  favouriteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    backgroundColor: colors.surface,
+    borderColor: colors.hairline,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: space.md,
+    paddingLeft: space.lg,
+    paddingRight: space.sm,
+  },
+
+  // Nickname editor modal
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(36, 31, 26, 0.45)",
+    justifyContent: "center",
+    paddingHorizontal: space.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: space.lg,
+    gap: space.sm,
+  },
+  modalTitle: {
+    fontSize: type.lg,
+    fontWeight: "800",
+    color: colors.ink,
+  },
+  modalSubtitle: {
+    fontSize: type.label,
+    color: colors.inkMuted,
+  },
+  modalInput: {
+    backgroundColor: colors.surfaceSunk,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+    fontSize: type.body,
+    color: colors.ink,
+    marginTop: space.xs,
+  },
+  modalActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: space.md,
+    marginTop: space.sm,
   },
 });
-
