@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Text, TouchableOpacity, View } from "react-native";
 import { sharedStyles } from "../styles";
 import { colors, space } from "../theme";
@@ -17,11 +18,39 @@ export function NearbyStopCard({
   onToggleFavourite,
 }: NearbyStopCardProps) {
   const metres = (busStop.Distance * 1000).toFixed(0);
+  const router = useRouter();
+
+  const openBusRoute = (arrival: BusArrival) => {
+    router.push({
+      pathname: "/bus-route/[serviceNo]",
+      params: {
+        serviceNo: arrival.ServiceNo,
+        stopCode: busStop.BusStopCode,
+        stopName: busStop.Description,
+      },
+    });
+  };
 
   return (
     <View style={[sharedStyles.stopBlock, { marginBottom: space.lg }]}>
       <View style={sharedStyles.stopHeaderRow}>
-        <View style={{ flex: 1, gap: 2 }}>
+        <TouchableOpacity
+          style={{ flex: 1, gap: 2 }}
+          onPress={() =>
+            router.push({
+              pathname: "/bus-stop/[code]",
+              params: {
+                code: busStop.BusStopCode,
+                name: busStop.Description,
+                subtitle: busStop.RoadName,
+              },
+            })
+          }
+          activeOpacity={0.65}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${busStop.Description}`}
+          accessibilityHint="Shows all arrivals at this stop"
+        >
           <Text style={sharedStyles.stopName}>{busStop.Description}</Text>
           <View style={sharedStyles.stopMetaRow}>
             <Ionicons name="walk" size={14} color={colors.inkMuted} />
@@ -29,7 +58,7 @@ export function NearbyStopCard({
               {metres} m · {busStop.RoadName} · {busStop.BusStopCode}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={onToggleFavourite}
           style={sharedStyles.iconButton}
@@ -52,6 +81,7 @@ export function NearbyStopCard({
           <BusCard
             key={`${busStop.BusStopCode}-${arrival.ServiceNo}`}
             arrival={arrival}
+            onPress={() => openBusRoute(arrival)}
           />
         ))
       ) : (

@@ -95,7 +95,20 @@ export default function BusStopDetail() {
           </View>
         ) : hasArrivals ? (
           busArrivals.map((arrival) => (
-            <BusCard key={arrival.ServiceNo} arrival={arrival} />
+            <BusCard
+              key={arrival.ServiceNo}
+              arrival={arrival}
+              onPress={() =>
+                router.push({
+                  pathname: "/bus-route/[serviceNo]",
+                  params: {
+                    serviceNo: arrival.ServiceNo,
+                    stopCode: code,
+                    stopName: busStopName,
+                  },
+                })
+              }
+            />
           ))
         ) : (
           <View style={sharedStyles.stateContainer}>

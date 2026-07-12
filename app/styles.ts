@@ -259,6 +259,108 @@ export const sharedStyles = StyleSheet.create({
     paddingRight: space.sm,
   },
 
+  // Direction segmented control (bus route page)
+  segmented: {
+    flexDirection: "row",
+    backgroundColor: colors.surfaceSunk,
+    borderRadius: radius.md,
+    padding: 3,
+    gap: 3,
+  },
+  segmentOption: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: space.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  segmentOptionActive: {
+    backgroundColor: colors.surface,
+    borderColor: colors.hairline,
+  },
+  segmentLabel: {
+    fontSize: type.body,
+    fontWeight: "600",
+    color: colors.inkMuted,
+    textAlign: "center",
+  },
+  segmentLabelActive: {
+    color: colors.ink,
+    fontWeight: "700",
+  },
+
+  // Route timeline (bus route page) — rail of dots joined by a line
+  routeRow: {
+    flexDirection: "row",
+    gap: space.md,
+  },
+  routeRail: {
+    width: 14,
+    alignItems: "center",
+  },
+  routeLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: colors.hairline,
+  },
+  routeLineHidden: {
+    width: 2,
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  routeDot: {
+    width: 12,
+    height: 12,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.inkFaint,
+    backgroundColor: colors.bg,
+  },
+  routeDotCurrent: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  routeDotLast: {
+    borderColor: colors.ink,
+    backgroundColor: colors.ink,
+  },
+  routeRowBody: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingVertical: space.md,
+  },
+  routeStopText: {
+    flex: 1,
+    gap: 2,
+  },
+  routeStopName: {
+    fontSize: type.body,
+    fontWeight: "600",
+    color: colors.ink,
+  },
+  routeStopMeta: {
+    fontSize: type.label,
+    color: colors.inkMuted,
+  },
+  routeCurrentLabel: {
+    fontSize: type.caption,
+    fontWeight: "700",
+    color: colors.accentText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  routeStopCount: {
+    fontSize: type.body,
+    fontWeight: "700",
+    color: colors.inkFaint,
+    ...tabularNums,
+  },
+
   // Nickname editor modal
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,

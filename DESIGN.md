@@ -55,9 +55,11 @@ Route number is a strong bold label inside a sunk badge; the arrival minutes out
 
 - **TopBar** — in-app header (native header is disabled). Title + optional back + optional right action. Replaces the old oversized "← Home" button and the hidden Material header.
 - **FreshnessLine** — coloured dot + "Updated 12s ago". Honest data age on every data screen.
-- **BusCard** — route badge + wheelchair icon + operator on the left, hero minutes on the right; follow-up arrivals as chips with load dots.
+- **BusCard** — route badge + wheelchair icon + operator on the left, hero minutes on the right; follow-up arrivals as chips with load dots. Tappable (with a faint chevron) to open the route's next stops.
 - **NearbyStopCard** — stop name + walk distance (icon) + favourite star; grouped by spacing, not nested cards.
 - **iconButton** — 44×44 circular sunk touch target. Meets the 44pt minimum.
+- **Route timeline** (bus route page) — rail of hairline-joined dots: accent dot = current stop, outlined dots = stops ahead, ink dot = terminus. Each row is a 44pt+ tappable target opening that stop's arrivals; right-aligned tabular number = stops away. Route data is static, so no freshness line and no auto-refresh.
+- **Segmented control** — sunk track, raised active option with hairline border. Used to pick route direction ("To {terminus}") when a service calls at the stop in both directions.
 
 Elevation is restrained: hairline borders over heavy drop shadows. No card-on-card nesting.
 
