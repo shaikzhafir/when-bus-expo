@@ -1,10 +1,11 @@
-.PHONY: help start pair connect run build-debug lint bump-version keystore keystore-backup doctor \
+.PHONY: emu-setup emu emu-stop emu-test emu-shot help start pair connect run build-debug lint bump-version keystore keystore-backup doctor \
 	build-home list-home fetch-home submit-home release-home prune-home
 
 # React Native app built by android-builder: Metro for JS, the committed
 # android/ Gradle project for the binary, the homeserver for signed releases.
 ANDROID_HOME_CLI ?= $(HOME)/Projects/Mobile/android-builder/bin/android-home
 ANDROID_PAIR_CLI ?= $(HOME)/Projects/Mobile/android-builder/bin/android-pair
+ANDROID_EMU_CLI ?= $(HOME)/Projects/Mobile/android-builder/bin/android-emu
 # Android Studio's bundled JDK if installed, else Homebrew's openjdk@17.
 export JAVA_HOME ?= $(shell for d in "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 	/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home; do \
@@ -20,6 +21,12 @@ help:
 		"  make run              Build, install and launch a debug build on a device/emulator" \
 		"  make pair / connect   Pair or reconnect a phone over Wi-Fi" \
 		"  make lint             Expo lint" \
+		"" \
+		"  make emu-setup        One-time: install the emulator and create the test AVD" \
+		"  make emu              Boot the headless emulator (make run then targets it)" \
+		"  make emu-test [APK=f] Smoke test an APK on the emulator (default: newest artifacts/*.apk)" \
+		"  make emu-shot         Screenshot the emulator into artifacts/" \
+		"  make emu-stop         Shut the emulator down" \
 		"" \
 		"  make build-home       Signed release AAB on the homeserver" \
 		"  make build-home KIND=apk   Signed release APK, for sideloading" \
@@ -78,3 +85,18 @@ release-home: lint build-home submit-home
 
 prune-home:
 	$(ANDROID_HOME_CLI) prune $(KEEP)
+
+emu-setup:
+	$(ANDROID_EMU_CLI) setup
+
+emu:
+	$(ANDROID_EMU_CLI) start
+
+emu-stop:
+	$(ANDROID_EMU_CLI) stop
+
+emu-shot:
+	@$(ANDROID_EMU_CLI) shot
+
+emu-test:
+	scripts/emu-smoke.sh $(APK)
