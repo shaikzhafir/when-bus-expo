@@ -42,8 +42,7 @@ credentials.json
 
 app-example
 
-# generated native folders
+# generated native folders (android/ is committed; see README)
 /ios
-/android
 
 when-bus-*.json

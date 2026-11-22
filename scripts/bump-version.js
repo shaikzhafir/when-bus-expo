@@ -54,6 +54,14 @@ writeJson(files.app, appJson);
 writeJson(files.package, packageJson);
 writeJson(files.lock, packageLock);
 
+// The Android build reads versionName from here (android/app/build.gradle).
+const gradleProps = "android/gradle.properties";
+const props = fs.readFileSync(gradleProps, "utf8");
+if (!/^appVersionName=.*$/m.test(props)) {
+  throw new Error(`appVersionName not found in ${gradleProps}`);
+}
+fs.writeFileSync(gradleProps, props.replace(/^appVersionName=.*$/m, `appVersionName=${newVersion}`));
+
 if (currentVersion === newVersion) {
   console.log(`App version already set to ${newVersion}`);
 } else if (requestedVersion) {

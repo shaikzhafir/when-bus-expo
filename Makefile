@@ -1,31 +1,51 @@
-.PHONY: help lint bump-version login login-home status first-release release-home release-eas build-eas build-home submit-eas submit-home list-home eas-version docker-android-image eas-login eas-prod-android eas-build-status playstore-first-release playstore-submit submit-eas-latest submit-homeserver-latest homeserver-builds homeserver-android-production
+.PHONY: help start pair connect run build-debug lint bump-version keystore keystore-backup doctor \
+	build-home list-home fetch-home submit-home release-home prune-home
 
-EAS := npx --yes eas-cli@latest
+# React Native app built by android-builder: Metro for JS, the committed
+# android/ Gradle project for the binary, the homeserver for signed releases.
+ANDROID_HOME_CLI ?= $(HOME)/Projects/Mobile/android-builder/bin/android-home
+ANDROID_PAIR_CLI ?= $(HOME)/Projects/Mobile/android-builder/bin/android-pair
+# Android Studio's bundled JDK if installed, else Homebrew's openjdk@17.
+export JAVA_HOME ?= $(shell for d in "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+	/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home; do \
+	[ -d "$$d" ] && { echo "$$d"; break; }; done)
+export ANDROID_HOME ?= $(HOME)/Library/Android/sdk
+TRACK ?= internal
 
 help:
 	@printf "%s\n" \
-		"when-bus release commands:" \
+		"when-bus (com.zadusz.whenbus): React Native, built by android-builder." \
 		"" \
-		"  make release-home     Build and submit from the homeserver" \
-		"  make release-eas      Build and submit via EAS cloud" \
-		"  make build-eas        Build production AAB with EAS" \
-		"  make build-home       Build production AAB on the homeserver" \
-		"  make list-home        List homeserver production AABs" \
-		"  make submit-eas       Submit latest EAS production build by ID" \
-		"  make submit-home      Submit latest homeserver AAB by path" \
+		"  make start            Metro dev server (JS changes hot reload)" \
+		"  make run              Build, install and launch a debug build on a device/emulator" \
+		"  make pair / connect   Pair or reconnect a phone over Wi-Fi" \
+		"  make lint             Expo lint" \
 		"" \
-		"Useful helpers:" \
-		"  make lint             Run Expo lint" \
-		"  make bump-version     Increment app patch version" \
-		"  make login            Log in to Expo/EAS" \
-		"  make login-home       Save an Expo token for homeserver Docker" \
-		"  make eas-version      Show EAS remote Android versionCode" \
-		"  make status BUILD_ID=id  Check an EAS build status" \
-		"  make first-release    Print first Play Store upload checklist" \
-		"  make docker-android-image  Build the local Android EAS image" \
+		"  make build-home       Signed release AAB on the homeserver" \
+		"  make build-home KIND=apk   Signed release APK, for sideloading" \
+		"  make list-home        List homeserver artifacts" \
+		"  make fetch-home       Download newest AAB to ./artifacts" \
+		"  make submit-home      Upload newest AAB to Play (TRACK=internal, draft)" \
+		"  make release-home     lint + build-home + submit-home" \
+		"  make bump-version [VERSION=x.y.z]   versionCode is automatic" \
 		"" \
-		"Pattern: make <action>-<source>, where source is eas or home." \
-		"  - Android package: com.zadusz.whenbus"
+		"  make keystore-backup  Copy the upload keystore to ~/.android-keystores" \
+		"  make doctor           Check homeserver, image, keystore, Play key"
+
+start:
+	npx expo start
+
+pair:
+	$(ANDROID_PAIR_CLI)
+
+connect:
+	$(ANDROID_PAIR_CLI) connect
+
+run:
+	npx expo run:android
+
+build-debug:
+	cd android && ./gradlew assembleDebug
 
 lint:
 	npm run lint
@@ -33,66 +53,28 @@ lint:
 bump-version:
 	node scripts/bump-version.js $(VERSION)
 
-build-home: bump-version lint
-	./scripts/homeserver-android-build.sh production
+keystore:
+	$(ANDROID_HOME_CLI) keystore
 
-docker-android-image:
-	docker build -t when-bus-eas-android:expo54 docker/android-eas
+keystore-backup:
+	$(ANDROID_HOME_CLI) keystore-backup
 
-release-home: build-home submit-home
+doctor:
+	$(ANDROID_HOME_CLI) doctor
+
+build-home:
+	$(ANDROID_HOME_CLI) build $(or $(KIND),aab)
 
 list-home:
-	@./scripts/list-homeserver-builds.sh
+	@$(ANDROID_HOME_CLI) list
 
-eas-version:
-	$(EAS) build:version:get --platform android --profile production
-
-login:
-	$(EAS) login
-
-login-home:
-	./scripts/homeserver-eas-login.sh
-
-build-eas: bump-version lint
-	$(EAS) build --profile production --platform android
-
-release-eas:
-	@EAS="$(EAS)" VERSION="$(VERSION)" EAS_BASE_CODE="$(EAS_BASE_CODE)" ./scripts/release-eas-android.sh
-
-status:
-	@test -n "$(BUILD_ID)" || (echo "Usage: make status BUILD_ID=<eas-build-id>"; exit 1)
-	$(EAS) build:view $(BUILD_ID)
-
-first-release:
-	@printf "%s\n" \
-		"First Google Play release checklist:" \
-		"" \
-		"1. Run: make build-eas" \
-		"2. Wait for the EAS Android production build to finish." \
-		"3. Download the .aab from the EAS build page." \
-		"4. Open Google Play Console: https://play.google.com/console" \
-		"5. Create/select the app with package com.zadusz.whenbus." \
-		"6. Complete store listing, privacy/data safety, content rating, and target audience." \
-		"7. Create an internal testing release and upload the .aab manually." \
-		"8. Afterwards, use make submit-eas or make submit-home."
-
-submit-eas:
-	./scripts/submit-android.sh eas
+fetch-home:
+	$(ANDROID_HOME_CLI) fetch $(or $(KIND),aab)
 
 submit-home:
-	@printf "%s\n" \
-		"Warning: submit-home uploads an AAB by file path." \
-		"Expo's Submissions page will not show Version/Build for homeserver path uploads." \
-		"Check Google Play Console or the AAB metadata printed below for release details." \
-		""
-	./scripts/submit-android.sh homeserver
+	$(ANDROID_HOME_CLI) submit $(TRACK)
 
-eas-login: login
-eas-prod-android: build-eas
-eas-build-status: status
-playstore-first-release: first-release
-playstore-submit: submit-eas
-submit-eas-latest: submit-eas
-submit-homeserver-latest: submit-home
-homeserver-builds: list-home
-homeserver-android-production: build-home
+release-home: lint build-home submit-home
+
+prune-home:
+	$(ANDROID_HOME_CLI) prune $(KEEP)
