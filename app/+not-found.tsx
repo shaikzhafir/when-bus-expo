@@ -1,30 +1,26 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { Link, Stack } from "expo-router";
+import { Text, TouchableOpacity, View } from "react-native";
+import { sharedStyles } from "./styles";
+import { colors } from "./theme";
 
 export default function NotFoundScreen() {
   return (
-    <>
-      <Stack.Screen options={{ title: 'Oops! Not Found' }} />
-      <View style={styles.container}>
-        <Link href="/" style={styles.button}>
-          Go back to Home screen!
+    <View style={[sharedStyles.screen, { justifyContent: "center" }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={sharedStyles.stateContainer}>
+        <Ionicons name="help-circle-outline" size={32} color={colors.inkMuted} />
+        <Text style={sharedStyles.stateText}>This screen doesn&rsquo;t exist.</Text>
+        {/* asChild so the tap target is a real 44pt touchable, not bare text */}
+        <Link href="/" asChild>
+          <TouchableOpacity
+            style={sharedStyles.textButton}
+            accessibilityRole="link"
+          >
+            <Text style={sharedStyles.textButtonLabel}>Go to nearby stops</Text>
+          </TouchableOpacity>
         </Link>
       </View>
-    </>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#25292e',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  button: {
-    fontSize: 20,
-    textDecorationLine: 'underline',
-    color: '#fff',
-  },
-});

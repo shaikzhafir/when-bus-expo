@@ -11,6 +11,7 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,21 +19,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FreshnessLine } from "./components/FreshnessLine";
+import { EdgeScrims } from "./components/EdgeScrims";
 import { NearbyStopCard } from "./components/NearbyStopCard";
 import { TopBar } from "./components/TopBar";
 import { useFavourites } from "./hooks/useFavourites";
 import { sharedStyles } from "./styles";
-import { colors, space } from "./theme";
-import type { BusArrival, FavouriteStop } from "./types";
+import { colors, freshnessOf, screenEdgePadding, space } from "./theme";
+import type { FavouriteStop, NearestBusStop } from "./types";
 import { distanceMeters } from "./utils";
-
-interface NearestBusStop {
-  BusStopCode: string;
-  RoadName: string;
-  Description: string;
-  Distance: number;
-  Arrivals: BusArrival[];
-}
 
 interface Coordinates {
   latitude: number;
@@ -41,9 +35,14 @@ interface Coordinates {
 
 const API_BASE_URL = "https://when-bus-api.shaikzhafir.com";
 const AUTO_REFRESH_MS = 30_000;
+const STALE_CHECK_MS = 5_000;
 // Reuse a recent GPS fix for rapid refreshes, but re-fix if the device moved.
 const LOCATION_TTL_MS = 15_000;
 const MOVE_THRESHOLD_M = 50;
+// Movement checks can extend a fix's life, but past this age we always get a
+// real fix (in the background) — getLastKnownPositionAsync alone could pin us
+// to an old spot, since it only updates when something requests a fix.
+const LOCATION_MAX_AGE_MS = 180_000;
 
 export default function Index() {
   const [location, setLocation] = useState<Coordinates | null>(null);
@@ -67,6 +66,14 @@ export default function Index() {
   const locationRef = useRef<Coordinates | null>(null);
   const locationTimeRef = useRef(0);
   const inFlight = useRef(false);
+  const gpsRefixInFlight = useRef(false);
+  // Locate button pressed and the real GPS fix is still in flight — data on
+  // screen keeps serving, but the user sees their position is being updated.
+  const [isRefixingLocation, setIsRefixingLocation] = useState(false);
+  // Data older than the stale threshold must look untrustworthy even when
+  // nothing else has re-rendered the screen since the last successful fetch.
+  const [isStale, setIsStale] = useState(false);
+  const lastUpdatedRef = useRef<Date | null>(null);
   const [editingFav, setEditingFav] = useState<FavouriteStop | null>(null);
   const [nicknameDraft, setNicknameDraft] = useState("");
 
@@ -95,26 +102,40 @@ export default function Index() {
   const hiddenBusStops =
     nearestBusStops.length > 3 ? nearestBusStops.slice(-3) : [];
 
-  const fetchNearestBusStops = useCallback(async (lat: number, lng: number) => {
-    setIsLoadingBusStops(true);
-    setLoadingPhase("fetching");
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/getNearestBusStops?lat=${lat}&lng=${lng}`,
-      );
-      if (!response.ok) throw new Error(`Server returned ${response.status}`);
-      const data = await response.json();
-      setNearestBusStops(Array.isArray(data) ? data : []);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (err) {
-      console.error("Failed to fetch nearest bus stops:", err);
-      setError("Couldn't load nearby stops. Pull down to retry.");
-    } finally {
-      setIsLoadingBusStops(false);
-      setLoadingPhase(null);
-    }
-  }, []);
+  // The 30s auto-refresh fetches silently: it never touches the loading UI,
+  // so the reading surface doesn't flicker every cycle. User-initiated loads
+  // (cold load, pull-to-refresh, locate button) show the phase text.
+  const fetchNearestBusStops = useCallback(
+    async (lat: number, lng: number, opts?: { silent?: boolean }) => {
+      const silent = opts?.silent ?? false;
+      if (!silent) {
+        setIsLoadingBusStops(true);
+        setLoadingPhase("fetching");
+      }
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/getNearestBusStops?lat=${lat}&lng=${lng}`,
+        );
+        if (!response.ok) throw new Error(`Server returned ${response.status}`);
+        const data = await response.json();
+        const now = new Date();
+        setNearestBusStops(Array.isArray(data) ? data : []);
+        setLastUpdated(now);
+        lastUpdatedRef.current = now;
+        setIsStale(false);
+        setError(null);
+      } catch (err) {
+        console.error("Failed to fetch nearest bus stops:", err);
+        setError("Couldn't load nearby stops. Pull down to retry.");
+      } finally {
+        if (!silent) {
+          setIsLoadingBusStops(false);
+          setLoadingPhase(null);
+        }
+      }
+    },
+    [],
+  );
 
   const requestLocationPermission = useCallback(async () => {
     try {
@@ -132,12 +153,53 @@ export default function Index() {
     }
   }, []);
 
+  // A full GPS fix can take seconds, so it runs off the refresh path: the
+  // refresh serves cached coords instantly, and if the real fix lands
+  // somewhere else we silently re-fetch for the new position. alwaysRefetch
+  // is for the explicit Locate button, where the user expects fresh data even
+  // when they haven't moved.
+  const refixLocationInBackground = useCallback(
+    async (opts?: { alwaysRefetch?: boolean }) => {
+      if (gpsRefixInFlight.current) return;
+      gpsRefixInFlight.current = true;
+      setIsRefixingLocation(true);
+      try {
+        const fix = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+        });
+        const coords = {
+          latitude: fix.coords.latitude,
+          longitude: fix.coords.longitude,
+        };
+        const prev = locationRef.current;
+        setLocation(coords);
+        locationRef.current = coords;
+        locationTimeRef.current = Date.now();
+        const moved =
+          !!prev && distanceMeters(prev, coords) > MOVE_THRESHOLD_M;
+        if (moved || opts?.alwaysRefetch) {
+          await fetchNearestBusStops(coords.latitude, coords.longitude, {
+            silent: true,
+          });
+        }
+      } catch {
+        // Keep showing data for the cached position; the next refresh retries.
+      } finally {
+        gpsRefixInFlight.current = false;
+        setIsRefixingLocation(false);
+      }
+    },
+    [fetchNearestBusStops],
+  );
+
   const getCurrentLocation = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
       if (inFlight.current) return;
       inFlight.current = true;
       if (mode === "refresh") setIsRefreshing(true);
       else setIsLoading(true);
+      // User-initiated loads show which phase they're waiting on (GPS vs
+      // arrivals API). Only the 30s auto-refresh is silent.
       setLoadingPhase("locating");
       setError(null);
 
@@ -151,25 +213,34 @@ export default function Index() {
       }
 
       try {
-        // Fast path: on rapid refreshes reuse the cached fix unless the device
-        // has actually moved. getLastKnownPositionAsync is OS-cached (cheap),
-        // so we detect movement without paying for a full GPS fix.
+        // Refresh path: never block a refresh on a full GPS fix. Within the
+        // TTL reuse the cached fix as-is; after that, a movement check against
+        // the OS-cached getLastKnownPositionAsync (cheap, no new fix) extends
+        // its life while the device stays put. When the device moved or the
+        // fix passed the hard age cap, fetch immediately with the best coords
+        // available and get the real fix in the background.
         if (mode === "refresh" && locationRef.current) {
-          const age = Date.now() - locationTimeRef.current;
-          if (age < LOCATION_TTL_MS) {
+          const fixAge = Date.now() - locationTimeRef.current;
+          let coords = locationRef.current;
+          let needsRefix = fixAge >= LOCATION_MAX_AGE_MS;
+          if (fixAge >= LOCATION_TTL_MS) {
             const lastKnown = await Location.getLastKnownPositionAsync();
-            const moved =
-              !!lastKnown &&
-              distanceMeters(locationRef.current, lastKnown.coords) >
-                MOVE_THRESHOLD_M;
-            if (!moved) {
-              await fetchNearestBusStops(
-                locationRef.current.latitude,
-                locationRef.current.longitude,
-              );
-              return; // finally resets inFlight + flags
+            if (
+              lastKnown &&
+              distanceMeters(coords, lastKnown.coords) > MOVE_THRESHOLD_M
+            ) {
+              coords = {
+                latitude: lastKnown.coords.latitude,
+                longitude: lastKnown.coords.longitude,
+              };
+              setLocation(coords);
+              locationRef.current = coords;
+              needsRefix = true;
             }
           }
+          if (needsRefix) refixLocationInBackground();
+          await fetchNearestBusStops(coords.latitude, coords.longitude);
+          return; // finally resets inFlight + flags
         }
 
         const timeoutPromise = new Promise<never>((_, reject) =>
@@ -214,8 +285,20 @@ export default function Index() {
         setLoadingPhase(null);
       }
     },
-    [requestLocationPermission, fetchNearestBusStops],
+    [requestLocationPermission, fetchNearestBusStops, refixLocationInBackground],
   );
+
+  // Explicit "re-find me": always gets a real GPS fix and refreshes the list
+  // for it, but still off the UI path — cached data stays on screen while the
+  // fix is in flight.
+  const handleLocate = () => {
+    Haptics.selectionAsync();
+    if (locationRef.current) {
+      refixLocationInBackground({ alwaysRefetch: true });
+    } else {
+      getCurrentLocation("refresh");
+    }
+  };
 
   useEffect(() => {
     getCurrentLocation("initial");
@@ -228,11 +311,20 @@ export default function Index() {
         fetchNearestBusStops(
           locationRef.current.latitude,
           locationRef.current.longitude,
+          { silent: true },
         );
       }
     }, AUTO_REFRESH_MS);
     return () => clearInterval(id);
   }, [fetchNearestBusStops]);
+
+  useEffect(() => {
+    const id = setInterval(
+      () => setIsStale(freshnessOf(lastUpdatedRef.current) === "stale"),
+      STALE_CHECK_MS,
+    );
+    return () => clearInterval(id);
+  }, []);
 
   const showInitialSkeleton = isLoading && nearestBusStops.length === 0;
 
@@ -243,10 +335,7 @@ export default function Index() {
         style={sharedStyles.scrollView}
         contentContainerStyle={[
           sharedStyles.scrollContent,
-          {
-            paddingTop: insets.top + space.md,
-            paddingBottom: insets.bottom + space.xxl,
-          },
+          screenEdgePadding(insets),
         ]}
         scrollIndicatorInsets={{ top: insets.top, bottom: insets.bottom }}
         refreshControl={
@@ -263,14 +352,19 @@ export default function Index() {
           title="When Bus"
           right={
             <TouchableOpacity
-              style={sharedStyles.iconButton}
-              onPress={() => getCurrentLocation("refresh")}
-              disabled={isLoading || isRefreshing}
+              style={[
+                sharedStyles.locateChip,
+                (isLoading || isRefreshing || isRefixingLocation) &&
+                  sharedStyles.pressableDisabled,
+              ]}
+              onPress={handleLocate}
+              disabled={isLoading || isRefreshing || isRefixingLocation}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Refresh location and arrivals"
+              accessibilityLabel="Update my location and refresh stops"
             >
-              <Ionicons name="locate" size={22} color={colors.ink} />
+              <Ionicons name="locate" size={18} color={colors.ink} />
+              <Text style={sharedStyles.locateChipLabel}>Locate</Text>
             </TouchableOpacity>
           }
         />
@@ -284,18 +378,28 @@ export default function Index() {
             </Text>
           </View>
         )}
+        {!permissionDenied && !loadingPhase && isRefixingLocation && (
+          <View style={sharedStyles.statusRow}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={sharedStyles.statusText}>Updating your location…</Text>
+          </View>
+        )}
         {lastUpdated && !permissionDenied && !loadingPhase && (
-          <FreshnessLine updatedAt={lastUpdated} />
+          <FreshnessLine
+            updatedAt={lastUpdated}
+            errored={!!error && nearestBusStops.length > 0}
+          />
         )}
 
         {/* Favourites */}
         {favourites.length > 0 && (
-          <View style={{ gap: space.sm }}>
+          <View style={sharedStyles.section}>
             <Text style={sharedStyles.sectionTitle}>Favourites</Text>
             {favourites.map((fav) => (
               <View key={fav.BusStopCode} style={sharedStyles.favouriteRow}>
                 <TouchableOpacity
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, gap: 2 }}
+                  activeOpacity={0.65}
                   onPress={() =>
                     openBusStop(
                       fav.BusStopCode,
@@ -367,20 +471,17 @@ export default function Index() {
           </View>
         )}
 
-        {/* Nearby stops */}
-        {(location || isLoadingBusStops || loadingPhase) && !permissionDenied && (
-          <>
+        {/* Nearby stops (the error state above already covers the
+            nothing-loaded failure, so don't also show an empty section) */}
+        {(location || isLoadingBusStops || loadingPhase) &&
+          !permissionDenied &&
+          !(error && nearestBusStops.length === 0) && (
+          <View style={sharedStyles.section}>
             <Text style={sharedStyles.sectionTitle}>Nearby stops</Text>
             {showInitialSkeleton || (isLoadingBusStops && nearestBusStops.length === 0) ? (
+              // Phase text already sits in the status row under the title;
+              // repeating it here would show the same line twice.
               <>
-                <View style={sharedStyles.statusRow}>
-                  <ActivityIndicator size="small" color={colors.accent} />
-                  <Text style={sharedStyles.statusText}>
-                    {loadingPhase === "fetching"
-                      ? "Loading nearby stops…"
-                      : "Finding your location…"}
-                  </Text>
-                </View>
                 <View style={sharedStyles.skeleton} />
                 <View style={sharedStyles.skeleton} />
               </>
@@ -392,24 +493,35 @@ export default function Index() {
                     busStop={busStop}
                     isFavourite={isFavourite(busStop.BusStopCode)}
                     onToggleFavourite={() => toggleFavourite(busStop)}
+                    stale={isStale}
                   />
                 ))}
 
                 {hiddenBusStops.length > 0 && (
                   <TouchableOpacity
-                    style={sharedStyles.textButton}
-                    onPress={() => setShowMoreBusStops(!showMoreBusStops)}
+                    style={sharedStyles.disclosureButton}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setShowMoreBusStops(!showMoreBusStops);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showMoreBusStops }}
+                    accessibilityLabel={
+                      showMoreBusStops
+                        ? "Show fewer stops"
+                        : `Show ${hiddenBusStops.length} more stops nearby`
+                    }
                   >
+                    <Text style={sharedStyles.disclosureLabel}>
+                      {showMoreBusStops
+                        ? "Show fewer stops"
+                        : `Show ${hiddenBusStops.length} more stops`}
+                    </Text>
                     <Ionicons
                       name={showMoreBusStops ? "chevron-up" : "chevron-down"}
-                      size={18}
-                      color={colors.accentText}
+                      size={16}
+                      color={colors.inkMuted}
                     />
-                    <Text style={sharedStyles.textButtonLabel}>
-                      {showMoreBusStops
-                        ? "Show fewer"
-                        : `${hiddenBusStops.length} more stops nearby`}
-                    </Text>
                   </TouchableOpacity>
                 )}
 
@@ -420,6 +532,7 @@ export default function Index() {
                       busStop={busStop}
                       isFavourite={isFavourite(busStop.BusStopCode)}
                       onToggleFavourite={() => toggleFavourite(busStop)}
+                      stale={isStale}
                     />
                   ))}
               </>
@@ -429,13 +542,15 @@ export default function Index() {
                 <Text style={sharedStyles.stateText}>No bus stops nearby.</Text>
               </View>
             )}
-          </>
+          </View>
         )}
       </ScrollView>
+      <EdgeScrims />
 
       <Modal
         visible={editingFav !== null}
         transparent
+        statusBarTranslucent
         animationType="fade"
         onRequestClose={() => setEditingFav(null)}
       >
@@ -443,8 +558,11 @@ export default function Index() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={sharedStyles.modalBackdrop}
         >
+          {/* Transparent dismiss layer — the KeyboardAvoidingView above
+              already carries the backdrop tint; tinting this too would
+              stack to double darkness. */}
           <TouchableOpacity
-            style={sharedStyles.modalBackdrop}
+            style={StyleSheet.absoluteFill}
             activeOpacity={1}
             onPress={() => setEditingFav(null)}
           />

@@ -10,11 +10,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BusCard } from "../components/BusCard";
+import { EdgeScrims } from "../components/EdgeScrims";
 import { FreshnessLine } from "../components/FreshnessLine";
 import { TopBar } from "../components/TopBar";
 import { useBusArrivals } from "../hooks/useBusArrivals";
 import { sharedStyles } from "../styles";
-import { colors, space } from "../theme";
+import { colors, screenEdgePadding, space } from "../theme";
 
 export default function BusStopDetail() {
   const { code, name, subtitle } = useLocalSearchParams<{
@@ -23,8 +24,15 @@ export default function BusStopDetail() {
     subtitle?: string;
   }>();
   const busStopName = name || `Bus Stop ${code}`;
-  const { isLoading, isRefreshing, busArrivals, lastUpdated, error, refresh } =
-    useBusArrivals(code);
+  const {
+    isLoading,
+    isRefreshing,
+    busArrivals,
+    lastUpdated,
+    error,
+    isStale,
+    refresh,
+  } = useBusArrivals(code);
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -37,10 +45,7 @@ export default function BusStopDetail() {
         style={sharedStyles.scrollView}
         contentContainerStyle={[
           sharedStyles.scrollContent,
-          {
-            paddingTop: insets.top + space.md,
-            paddingBottom: insets.bottom + space.xxl,
-          },
+          screenEdgePadding(insets),
         ]}
         scrollIndicatorInsets={{ top: insets.top, bottom: insets.bottom }}
         refreshControl={
@@ -69,13 +74,19 @@ export default function BusStopDetail() {
             </TouchableOpacity>
           }
         />
-        {isLoading || isRefreshing ? (
+        {/* Only the cold load swaps in a spinner row. Pull-to-refresh already
+            shows the RefreshControl, and auto-refresh is silent, so the
+            freshness line stays put while a commuter is reading times. */}
+        {isLoading ? (
           <View style={sharedStyles.statusRow}>
             <ActivityIndicator size="small" color={colors.accent} />
             <Text style={sharedStyles.statusText}>Loading arrivals…</Text>
           </View>
         ) : lastUpdated ? (
-          <FreshnessLine updatedAt={lastUpdated} />
+          <FreshnessLine
+            updatedAt={lastUpdated}
+            errored={!!error && hasArrivals}
+          />
         ) : null}
 
         {isLoading ? (
@@ -98,6 +109,7 @@ export default function BusStopDetail() {
             <BusCard
               key={arrival.ServiceNo}
               arrival={arrival}
+              stale={isStale}
               onPress={() =>
                 router.push({
                   pathname: "/bus-route/[serviceNo]",
@@ -117,6 +129,7 @@ export default function BusStopDetail() {
           </View>
         )}
       </ScrollView>
+      <EdgeScrims />
     </View>
   );
 }

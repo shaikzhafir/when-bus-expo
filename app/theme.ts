@@ -52,16 +52,43 @@ export const radius = {
   pill: 999,
 } as const;
 
+/**
+ * Type ramp. Each role bundles size + line-height (4px-grid friendly) so every
+ * multi-line string gets breathing room without per-style guesswork. Weights
+ * are assigned per role in styles: 800 display (hero, screen title), 700
+ * emphasis (stop names, timings, section headings), 600 controls, 400 body.
+ * Floors are biased up for sunlight glanceability (body never below 16).
+ */
 export const type = {
-  hero: 44, // the arrival minutes — the answer
-  title: 24,
-  lg: 18,
-  body: 15,
-  label: 13,
-  caption: 11,
+  hero: { fontSize: 44, lineHeight: 48, letterSpacing: -1.5 }, // the arrival minutes — the answer
+  title: { fontSize: 24, lineHeight: 30, letterSpacing: -0.5 },
+  lg: { fontSize: 18, lineHeight: 24 },
+  body: { fontSize: 16, lineHeight: 22 },
+  label: { fontSize: 14, lineHeight: 20 },
+  caption: { fontSize: 12, lineHeight: 16 },
 } as const;
 
 export const tabularNums = { fontVariant: ["tabular-nums" as const] };
+
+// Android pads text boxes with font ascent/descent, which makes large numerals
+// sit visibly low inside badges and cards; iOS ignores this prop.
+export const noFontPadding = { includeFontPadding: false as const };
+
+// Some Android devices report insets.bottom = 0 even though a translucent
+// 3-button nav bar (~48dp) still draws over the content, so the floor must
+// cover a full nav bar, not just cosmetic breathing room.
+const NAV_BAR_FALLBACK = 48;
+
+// Every screen's scroll content must clear the system bars by at least this
+// much beyond the safe-area inset, so the last/first row never sits against
+// the status bar or home indicator. See .claude/skills/safe-area.
+export const screenEdgePadding = (insets: {
+  top: number;
+  bottom: number;
+}) => ({
+  paddingTop: insets.top + space.md,
+  paddingBottom: Math.max(insets.bottom, NAV_BAR_FALLBACK) + space.xxl + space.lg,
+});
 
 /** Freshness of a timestamp: live (<45s), recent, or stale (>90s). */
 export type Freshness = "live" | "recent" | "stale";
@@ -74,12 +101,13 @@ export const freshnessOf = (since: Date | null): Freshness => {
   return "stale";
 };
 
-/** "just now" / "12s ago" / "3m ago" relative label. */
+/** "just now" / "12s ago" / "3m ago" / "2h ago" relative label. */
 export const agoLabel = (since: Date | null): string => {
   if (!since) return "never";
   const seconds = Math.max(0, Math.round((Date.now() - since.getTime()) / 1000));
   if (seconds < 5) return "just now";
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.round(seconds / 60);
-  return `${minutes}m ago`;
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.round(minutes / 60)}h ago`;
 };

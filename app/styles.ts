@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { colors, radius, space, tabularNums, type } from "./theme";
+import { colors, noFontPadding, radius, space, tabularNums, type } from "./theme";
 
 export const sharedStyles = StyleSheet.create({
   screen: {
@@ -21,19 +21,19 @@ export const sharedStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space.md,
-    paddingBottom: space.md,
+    paddingBottom: space.sm,
   },
   topBarTitleWrap: {
     flex: 1,
   },
   topBarTitle: {
-    fontSize: type.title,
+    ...type.title,
+    ...noFontPadding,
     fontWeight: "800",
     color: colors.ink,
-    letterSpacing: -0.5,
   },
   topBarSubtitle: {
-    fontSize: type.label,
+    ...type.label,
     color: colors.inkMuted,
     marginTop: 2,
   },
@@ -45,13 +45,30 @@ export const sharedStyles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.surfaceSunk,
   },
+  locateChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    height: 44,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    backgroundColor: colors.surfaceSunk,
+  },
+  locateChipLabel: {
+    ...type.label,
+    fontWeight: "600",
+    color: colors.ink,
+  },
+  // Disabled visual for any touchable; RN's disabled prop alone gives no cue.
+  pressableDisabled: {
+    opacity: 0.4,
+  },
 
   // Freshness line under the title
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: space.sm,
-    marginTop: -space.xs,
   },
   statusDot: {
     width: 8,
@@ -59,23 +76,35 @@ export const sharedStyles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   statusText: {
-    fontSize: type.label,
+    ...type.label,
     color: colors.inkMuted,
   },
+  statusTextErrored: {
+    color: colors.loadLimited,
+    fontWeight: "700",
+  },
 
-  // Section heading
+  // Section = heading + its content. Spacing rhythm is 8 within a group,
+  // 24 between stop groups, 36 between sections (marginTop xl + parent gap),
+  // so grouping always separates less than the section boundary above it.
+  section: {
+    gap: space.sm,
+    marginTop: space.xl,
+  },
   sectionTitle: {
-    fontSize: type.label,
+    ...type.label,
     fontWeight: "700",
     color: colors.inkMuted,
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    marginTop: space.sm,
   },
 
-  // Stop block (no card chrome on the stop itself; spacing groups it)
+  // Stop block (no card chrome on the stop itself; spacing groups it).
+  // The extra bottom margin separates stop groups more than the cards
+  // within one, so grouping reads from spacing alone.
   stopBlock: {
     gap: space.sm,
+    marginBottom: space.lg,
   },
   stopHeaderRow: {
     flexDirection: "row",
@@ -84,7 +113,7 @@ export const sharedStyles = StyleSheet.create({
   },
   stopName: {
     flex: 1,
-    fontSize: type.lg,
+    ...type.lg,
     fontWeight: "700",
     color: colors.ink,
   },
@@ -94,7 +123,7 @@ export const sharedStyles = StyleSheet.create({
     gap: space.sm,
   },
   stopMeta: {
-    fontSize: type.label,
+    ...type.label,
     color: colors.inkMuted,
   },
 
@@ -122,29 +151,29 @@ export const sharedStyles = StyleSheet.create({
     alignItems: "center",
   },
   routeNumber: {
-    fontSize: type.lg,
+    ...type.lg,
+    ...noFontPadding,
     fontWeight: "800",
     color: colors.ink,
     ...tabularNums,
   },
   // The hero: next arrival
   heroValue: {
-    fontSize: type.hero,
+    ...type.hero,
+    ...noFontPadding,
     fontWeight: "800",
     color: colors.ink,
-    letterSpacing: -1.5,
     ...tabularNums,
   },
   heroUnit: {
-    fontSize: type.body,
+    ...type.body,
     fontWeight: "600",
     color: colors.inkMuted,
   },
   heroArriving: {
-    fontSize: type.title,
+    ...type.title,
     fontWeight: "800",
     color: colors.accentText,
-    letterSpacing: -0.5,
   },
 
   // Following arrivals row
@@ -163,7 +192,7 @@ export const sharedStyles = StyleSheet.create({
     paddingVertical: space.sm,
   },
   followTime: {
-    fontSize: type.body,
+    ...type.body,
     fontWeight: "700",
     color: colors.ink,
     ...tabularNums,
@@ -174,21 +203,26 @@ export const sharedStyles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   loadLabel: {
-    fontSize: type.caption,
+    ...type.caption,
     color: colors.inkMuted,
   },
   operator: {
-    fontSize: type.caption,
+    ...type.caption,
     color: colors.inkMuted,
     fontWeight: "600",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   heroImminent: {
     color: colors.accentText,
   },
+  // Data past the stale threshold: the numbers themselves stop looking
+  // trustworthy, not just the freshness dot.
+  heroStale: {
+    color: colors.inkFaint,
+  },
   noTiming: {
-    fontSize: type.body,
+    ...type.body,
     color: colors.inkMuted,
     fontStyle: "italic",
   },
@@ -205,18 +239,36 @@ export const sharedStyles = StyleSheet.create({
     minHeight: 52,
   },
   primaryButtonText: {
-    fontSize: type.lg,
+    ...type.lg,
     fontWeight: "700",
     color: colors.onAccent,
+  },
+  // Full-width fold toggle for the farther nearby stops
+  disclosureButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    minHeight: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSunk,
+    paddingHorizontal: space.lg,
+  },
+  disclosureLabel: {
+    ...type.body,
+    fontWeight: "600",
+    color: colors.ink,
   },
   textButton: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: space.xs,
-    paddingVertical: space.sm,
+    minHeight: 44,
+    paddingHorizontal: space.sm,
   },
   textButtonLabel: {
-    fontSize: type.body,
+    ...type.body,
     fontWeight: "600",
     color: colors.accentText,
   },
@@ -228,12 +280,12 @@ export const sharedStyles = StyleSheet.create({
     gap: space.md,
   },
   stateText: {
-    fontSize: type.body,
+    ...type.body,
     color: colors.inkMuted,
     textAlign: "center",
   },
   stateTextError: {
-    fontSize: type.body,
+    ...type.body,
     color: colors.loadLimited,
     textAlign: "center",
   },
@@ -282,7 +334,7 @@ export const sharedStyles = StyleSheet.create({
     borderColor: colors.hairline,
   },
   segmentLabel: {
-    fontSize: type.body,
+    ...type.body,
     fontWeight: "600",
     color: colors.inkMuted,
     textAlign: "center",
@@ -339,23 +391,23 @@ export const sharedStyles = StyleSheet.create({
     gap: 2,
   },
   routeStopName: {
-    fontSize: type.body,
+    ...type.body,
     fontWeight: "600",
     color: colors.ink,
   },
   routeStopMeta: {
-    fontSize: type.label,
+    ...type.label,
     color: colors.inkMuted,
   },
   routeCurrentLabel: {
-    fontSize: type.caption,
+    ...type.caption,
     fontWeight: "700",
     color: colors.accentText,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   routeStopCount: {
-    fontSize: type.body,
+    ...type.body,
     fontWeight: "700",
     color: colors.inkFaint,
     ...tabularNums,
@@ -375,12 +427,12 @@ export const sharedStyles = StyleSheet.create({
     gap: space.sm,
   },
   modalTitle: {
-    fontSize: type.lg,
-    fontWeight: "800",
+    ...type.lg,
+    fontWeight: "700",
     color: colors.ink,
   },
   modalSubtitle: {
-    fontSize: type.label,
+    ...type.label,
     color: colors.inkMuted,
   },
   modalInput: {
@@ -388,7 +440,7 @@ export const sharedStyles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: space.md,
     paddingVertical: space.md,
-    fontSize: type.body,
+    ...type.body,
     color: colors.ink,
     marginTop: space.xs,
   },

@@ -25,6 +25,25 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Release Android
+
+Build on the homeserver Docker image and submit to the Google Play internal
+track:
+
+```bash
+make release-home
+```
+
+This bumps the app patch version, runs lint, builds an Android AAB with
+`eas build --local` on the homeserver, and submits the newest homeserver AAB.
+EAS auto-increments Android `versionCode`.
+
+To release a specific app version instead of auto-bumping:
+
+```bash
+VERSION=1.0.5 make release-home
+```
+
 ## Get a fresh project
 
 When you're ready, run:

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Text, View } from "react-native";
 import { sharedStyles } from "../styles";
 import { agoLabel, colors, freshnessOf } from "../theme";
 
@@ -12,6 +12,11 @@ const DOT_COLOR = {
 type FreshnessLineProps = {
   updatedAt: Date | null;
   label?: string;
+  /**
+   * Last background refresh failed while data is still on screen. The line
+   * turns into a warning so a commuter never trusts a silently-dead feed.
+   */
+  errored?: boolean;
 };
 
 const exactTimeLabel = (date: Date) =>
@@ -23,46 +28,44 @@ const exactTimeLabel = (date: Date) =>
 
 /**
  * Honest data-age indicator. A coloured dot (paired with text, never colour
- * alone) plus a relative timestamp so a commuter never trusts a stale time.
+ * alone) plus relative age and the exact fetch time, so a commuter always
+ * knows precisely when the data was last refreshed.
  */
-export function FreshnessLine({ updatedAt, label = "Updated" }: FreshnessLineProps) {
-  const [showExact, setShowExact] = useState(false);
+export function FreshnessLine({
+  updatedAt,
+  label = "Updated",
+  errored = false,
+}: FreshnessLineProps) {
   // Re-render once a second so the relative age counts up live.
   const [, tick] = useState(0);
-  const updatedTime = updatedAt?.getTime() ?? null;
 
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    setShowExact(false);
-  }, [updatedTime]);
-
   const freshness = freshnessOf(updatedAt);
-  const timeLabel =
-    showExact && updatedAt ? `at ${exactTimeLabel(updatedAt)}` : agoLabel(updatedAt);
+  const timeLabel = updatedAt
+    ? `${agoLabel(updatedAt)} · ${exactTimeLabel(updatedAt)}`
+    : agoLabel(updatedAt);
+  const prefix = errored
+    ? "Couldn't refresh · "
+    : freshness === "stale" && updatedAt
+      ? "Outdated · "
+      : "";
+  const line = `${prefix}${label} ${timeLabel}`;
 
   return (
-    <TouchableOpacity
-      style={sharedStyles.statusRow}
-      onPress={() => updatedAt && setShowExact((value) => !value)}
-      activeOpacity={0.7}
-      disabled={!updatedAt}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={
-        updatedAt
-          ? `${label} ${showExact ? agoLabel(updatedAt) : `at ${exactTimeLabel(updatedAt)}`}`
-          : `${label} never`
-      }
-    >
-      <View style={[sharedStyles.statusDot, { backgroundColor: DOT_COLOR[freshness] }]} />
-      <Text style={sharedStyles.statusText}>
-        {freshness === "stale" && updatedAt ? "Outdated · " : ""}
-        {label} {timeLabel}
+    <View style={sharedStyles.statusRow} accessibilityLabel={line}>
+      <View
+        style={[
+          sharedStyles.statusDot,
+          { backgroundColor: errored ? colors.loadLimited : DOT_COLOR[freshness] },
+        ]}
+      />
+      <Text style={[sharedStyles.statusText, errored && sharedStyles.statusTextErrored]}>
+        {line}
       </Text>
-    </TouchableOpacity>
+    </View>
   );
 }

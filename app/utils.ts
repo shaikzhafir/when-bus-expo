@@ -57,6 +57,13 @@ export const distanceMeters = (
   return 2 * R * Math.asin(Math.sqrt(h));
 };
 
+/** Walking distance from a km value: "320 m" under 1 km, "1.2 km" above. */
+export const formatDistance = (km: number) => {
+  const metres = Math.round(km * 1000);
+  if (metres < 1000) return `${metres} m`;
+  return `${(metres / 1000).toFixed(1)} km`;
+};
+
 /** Compact load label for inline chips. */
 export const getLoadShort = (load: string) => {
   switch (load) {

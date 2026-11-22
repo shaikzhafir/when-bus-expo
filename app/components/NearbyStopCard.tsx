@@ -2,22 +2,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text, TouchableOpacity, View } from "react-native";
 import { sharedStyles } from "../styles";
-import { colors, space } from "../theme";
+import { colors } from "../theme";
 import type { BusArrival, NearestBusStop } from "../types";
+import { formatDistance } from "../utils";
 import { BusCard } from "./BusCard";
 
 type NearbyStopCardProps = {
   busStop: NearestBusStop;
   isFavourite: boolean;
   onToggleFavourite: () => void;
+  /** Arrival data is past the stale threshold; dim the timings. */
+  stale?: boolean;
 };
 
 export function NearbyStopCard({
   busStop,
   isFavourite,
   onToggleFavourite,
+  stale = false,
 }: NearbyStopCardProps) {
-  const metres = (busStop.Distance * 1000).toFixed(0);
+  const walkDistance = formatDistance(busStop.Distance);
   const router = useRouter();
 
   const openBusRoute = (arrival: BusArrival) => {
@@ -32,7 +36,7 @@ export function NearbyStopCard({
   };
 
   return (
-    <View style={[sharedStyles.stopBlock, { marginBottom: space.lg }]}>
+    <View style={sharedStyles.stopBlock}>
       <View style={sharedStyles.stopHeaderRow}>
         <TouchableOpacity
           style={{ flex: 1, gap: 2 }}
@@ -48,14 +52,14 @@ export function NearbyStopCard({
           }
           activeOpacity={0.65}
           accessibilityRole="button"
-          accessibilityLabel={`Open ${busStop.Description}`}
+          accessibilityLabel={`Open ${busStop.Description}, ${walkDistance} away`}
           accessibilityHint="Shows all arrivals at this stop"
         >
           <Text style={sharedStyles.stopName}>{busStop.Description}</Text>
           <View style={sharedStyles.stopMetaRow}>
             <Ionicons name="walk" size={14} color={colors.inkMuted} />
             <Text style={sharedStyles.stopMeta}>
-              {metres} m · {busStop.RoadName} · {busStop.BusStopCode}
+              {walkDistance} · {busStop.RoadName} · {busStop.BusStopCode}
             </Text>
           </View>
         </TouchableOpacity>
@@ -81,12 +85,13 @@ export function NearbyStopCard({
           <BusCard
             key={`${busStop.BusStopCode}-${arrival.ServiceNo}`}
             arrival={arrival}
+            stale={stale}
             onPress={() => openBusRoute(arrival)}
           />
         ))
       ) : (
         <View style={[sharedStyles.busCard, { alignItems: "center" }]}>
-          <Text style={sharedStyles.noTiming}>No buses arriving</Text>
+          <Text style={sharedStyles.noTiming}>No buses arriving right now.</Text>
         </View>
       )}
     </View>

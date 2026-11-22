@@ -9,10 +9,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { EdgeScrims } from "../components/EdgeScrims";
 import { TopBar } from "../components/TopBar";
 import { useBusDetails } from "../hooks/useBusDetails";
 import { sharedStyles } from "../styles";
-import { colors, space } from "../theme";
+import { colors, screenEdgePadding } from "../theme";
 import type { BusDirectionDetails, BusRouteStop } from "../types";
 
 /** "To {terminus}" label for the direction toggle. */
@@ -58,10 +59,7 @@ export default function BusRouteDetail() {
         style={sharedStyles.scrollView}
         contentContainerStyle={[
           sharedStyles.scrollContent,
-          {
-            paddingTop: insets.top + space.md,
-            paddingBottom: insets.bottom + space.xxl,
-          },
+          screenEdgePadding(insets),
         ]}
         scrollIndicatorInsets={{ top: insets.top, bottom: insets.bottom }}
       >
@@ -140,7 +138,7 @@ export default function BusRouteDetail() {
                 </Text>
               </View>
             ) : (
-              <>
+              <View style={sharedStyles.section}>
                 <Text style={sharedStyles.sectionTitle}>Stops ahead</Text>
 
                 {/* Current stop pins the top of the rail */}
@@ -228,11 +226,12 @@ export default function BusRouteDetail() {
                     );
                   })}
                 </View>
-              </>
+              </View>
             )}
           </>
         )}
       </ScrollView>
+      <EdgeScrims />
     </View>
   );
 }

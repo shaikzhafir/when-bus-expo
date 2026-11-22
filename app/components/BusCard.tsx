@@ -3,12 +3,20 @@ import { Text, TouchableOpacity, View } from "react-native";
 import { sharedStyles } from "../styles";
 import { colors, space } from "../theme";
 import type { BusArrival } from "../types";
-import { getLoadColor, getLoadShort, getLoadText, minutesUntil } from "../utils";
+import {
+  formatTime,
+  getLoadColor,
+  getLoadShort,
+  getLoadText,
+  minutesUntil,
+} from "../utils";
 
 type BusCardProps = {
   arrival: BusArrival;
   /** When set, the card is tappable and opens the route's next stops. */
   onPress?: () => void;
+  /** Data is past the stale threshold; dim the timings so nobody trusts them. */
+  stale?: boolean;
 };
 
 const IMMINENT_MINS = 2;
@@ -19,7 +27,7 @@ function LoadIndicator({ load }: { load?: string }) {
   if (!short) return null;
   return (
     <View
-      style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+      style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}
       accessibilityLabel={getLoadText(load)}
     >
       <View style={[sharedStyles.loadDot, { backgroundColor: getLoadColor(load) }]} />
@@ -28,23 +36,41 @@ function LoadIndicator({ load }: { load?: string }) {
   );
 }
 
-export function BusCard({ arrival, onPress }: BusCardProps) {
+export function BusCard({ arrival, onPress, stale = false }: BusCardProps) {
   const times = arrival.NextBuses ?? [];
   const [next, ...rest] = times;
   const nextMins = next != null ? minutesUntil(next) : undefined;
   const imminent = nextMins != null && nextMins <= IMMINENT_MINS;
 
+  // The card sets `accessible`, which flattens its children for screen
+  // readers, so the label must carry everything sighted users can see:
+  // next arrival, load, follow-up times, staleness.
+  const minsSpeech = (raw: string) => {
+    const mins = minutesUntil(raw);
+    return mins == null
+      ? "arriving now"
+      : `${mins} ${mins === 1 ? "minute" : "minutes"}`;
+  };
+  const firstLoad = arrival.LoadStatus?.[0];
   const heroSpeech =
-    next == null
-      ? "no upcoming buses"
-      : nextMins == null
-        ? "arriving now"
-        : `${nextMins} ${nextMins === 1 ? "minute" : "minutes"}`;
+    (next == null ? "no upcoming buses" : minsSpeech(next)) +
+    (firstLoad ? `, ${getLoadText(firstLoad)}` : "") +
+    (rest.length > 0 ? `, then ${rest.map(minsSpeech).join(", ")}` : "") +
+    (stale ? ", timing outdated" : "");
 
   const content = (
     <>
       <View style={sharedStyles.busTopRow}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        {/* flexShrink so a long operator name truncates instead of
+            squeezing the hero minutes off the right edge */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: space.sm,
+            flexShrink: 1,
+          }}
+        >
           <View style={sharedStyles.routeBadge}>
             <Text style={sharedStyles.routeNumber}>{arrival.ServiceNo}</Text>
           </View>
@@ -57,7 +83,12 @@ export function BusCard({ arrival, onPress }: BusCardProps) {
             />
           )}
           {arrival.Operator ? (
-            <Text style={sharedStyles.operator}>{arrival.Operator}</Text>
+            <Text
+              style={[sharedStyles.operator, { flexShrink: 1 }]}
+              numberOfLines={1}
+            >
+              {arrival.Operator}
+            </Text>
           ) : null}
         </View>
 
@@ -65,13 +96,23 @@ export function BusCard({ arrival, onPress }: BusCardProps) {
           {next == null ? (
             <Text style={sharedStyles.noTiming}>No upcoming buses</Text>
           ) : nextMins == null ? (
-            <Text style={sharedStyles.heroArriving}>Arriving</Text>
+            <Text style={[sharedStyles.heroArriving, stale && sharedStyles.heroStale]}>
+              Arriving
+            </Text>
           ) : (
-            <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
-              <Text style={[sharedStyles.heroValue, imminent && sharedStyles.heroImminent]}>
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.xs }}>
+              <Text
+                style={[
+                  sharedStyles.heroValue,
+                  imminent && sharedStyles.heroImminent,
+                  stale && sharedStyles.heroStale,
+                ]}
+              >
                 {nextMins}
               </Text>
-              <Text style={sharedStyles.heroUnit}>{nextMins === 1 ? "min" : "mins"}</Text>
+              <Text style={[sharedStyles.heroUnit, stale && sharedStyles.heroStale]}>
+                {nextMins === 1 ? "min" : "mins"}
+              </Text>
             </View>
           )}
           {onPress && (
@@ -92,12 +133,15 @@ export function BusCard({ arrival, onPress }: BusCardProps) {
                 key={i}
                 style={sharedStyles.followChip}
                 accessibilityLabel={
-                  `Then ${mins == null ? "arriving" : `${mins} minutes`}` +
-                  (load ? `, ${getLoadText(load)}` : "")
+                  `Then ${
+                    mins == null
+                      ? "arriving"
+                      : `${mins} ${mins === 1 ? "minute" : "minutes"}`
+                  }` + (load ? `, ${getLoadText(load)}` : "")
                 }
               >
-                <Text style={sharedStyles.followTime}>
-                  {mins == null ? "Arriving" : `${mins} min`}
+                <Text style={[sharedStyles.followTime, stale && sharedStyles.heroStale]}>
+                  {formatTime(time)}
                 </Text>
                 {load && short ? (
                   <>
