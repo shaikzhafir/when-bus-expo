@@ -57,9 +57,48 @@ export const distanceMeters = (
   return 2 * R * Math.asin(Math.sqrt(h));
 };
 
+/** Initial great-circle bearing from a to b, degrees clockwise from north. */
+export const bearingDegrees = (
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+) => {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+};
+
+const COMPASS_POINTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
+const COMPASS_WORDS: Record<(typeof COMPASS_POINTS)[number], string> = {
+  N: "north",
+  NE: "north-east",
+  E: "east",
+  SE: "south-east",
+  S: "south",
+  SW: "south-west",
+  W: "west",
+  NW: "north-west",
+};
+
+/** Eight-point compass label for a bearing, e.g. 47 -> "NE". */
+export const compassPoint = (degrees: number) =>
+  COMPASS_POINTS[Math.round(degrees / 45) % 8];
+
+/** Spoken form of a compass point, for screen readers. */
+export const compassWord = (point: string) =>
+  COMPASS_WORDS[point as keyof typeof COMPASS_WORDS] ?? point;
+
 /** Walking distance from a km value: "320 m" under 1 km, "1.2 km" above. */
-export const formatDistance = (km: number) => {
-  const metres = Math.round(km * 1000);
+export const formatDistance = (km: number) => formatMetres(km * 1000);
+
+/** "320 m" under 1 km, "1.2 km" above. */
+export const formatMetres = (m: number) => {
+  const metres = Math.round(m);
   if (metres < 1000) return `${metres} m`;
   return `${(metres / 1000).toFixed(1)} km`;
 };

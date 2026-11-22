@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as Location from "expo-location";
 import { Stack, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -19,33 +19,33 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FreshnessLine } from "./components/FreshnessLine";
+import { LocationLine } from "./components/LocationLine";
 import { EdgeScrims } from "./components/EdgeScrims";
 import { NearbyStopCard } from "./components/NearbyStopCard";
 import { TopBar } from "./components/TopBar";
 import { useFavourites } from "./hooks/useFavourites";
+import { type Fix, useLiveLocation } from "./hooks/useLiveLocation";
 import { sharedStyles } from "./styles";
 import { colors, freshnessOf, screenEdgePadding, space } from "./theme";
 import type { FavouriteStop, NearestBusStop } from "./types";
 import { distanceMeters } from "./utils";
 
-interface Coordinates {
-  latitude: number;
-  longitude: number;
-}
-
 const API_BASE_URL = "https://when-bus-api.shaikzhafir.com";
 const AUTO_REFRESH_MS = 30_000;
 const STALE_CHECK_MS = 5_000;
-// Reuse a recent GPS fix for rapid refreshes, but re-fix if the device moved.
-const LOCATION_TTL_MS = 15_000;
-const MOVE_THRESHOLD_M = 50;
-// Movement checks can extend a fix's life, but past this age we always get a
-// real fix (in the background) — getLastKnownPositionAsync alone could pin us
-// to an old spot, since it only updates when something requests a fix.
-const LOCATION_MAX_AGE_MS = 180_000;
+// Walked this far from where the list was fetched: fetch it again. Stops on
+// opposite sides of a road are ~20 m apart.
+const REFETCH_MOVE_M = 25;
+// Pull-to-refresh and app resume trust a watched fix up to this age.
+const REFRESH_FIX_MAX_AGE_MS = 10_000;
+// The first paint may use a cached OS fix this old; the watch corrects it.
+const INITIAL_FIX_MAX_AGE_MS = 60_000;
+// Back from the background after this long: refresh position and arrivals.
+const RESUME_REFRESH_MS = 15_000;
+
+type Coordinates = { latitude: number; longitude: number };
 
 export default function Index() {
-  const [location, setLocation] = useState<Coordinates | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,12 +63,14 @@ export default function Index() {
   const router = useRouter();
   const { favourites, isFavourite, toggleFavourite, renameFavourite } =
     useFavourites();
-  const locationRef = useRef<Coordinates | null>(null);
-  const locationTimeRef = useRef(0);
   const inFlight = useRef(false);
-  const gpsRefixInFlight = useRef(false);
-  // Locate button pressed and the real GPS fix is still in flight — data on
-  // screen keeps serving, but the user sees their position is being updated.
+  // Where the list on screen was fetched for. Compared against every new fix.
+  const fetchedForRef = useRef<Coordinates | null>(null);
+  // Responses can land out of order (walking while a slow request is out);
+  // only the newest request may update the screen.
+  const fetchSeq = useRef(0);
+  // Getting a new fix while the list on screen keeps serving (Locate button,
+  // app resume): the user sees their position is being updated.
   const [isRefixingLocation, setIsRefixingLocation] = useState(false);
   // Data older than the stale threshold must look untrustworthy even when
   // nothing else has re-rendered the screen since the last successful fetch.
@@ -104,20 +106,23 @@ export default function Index() {
 
   // The 30s auto-refresh fetches silently: it never touches the loading UI,
   // so the reading surface doesn't flicker every cycle. User-initiated loads
-  // (cold load, pull-to-refresh, locate button) show the phase text.
+  // (cold load, pull-to-refresh) show the phase text.
   const fetchNearestBusStops = useCallback(
-    async (lat: number, lng: number, opts?: { silent?: boolean }) => {
+    async (at: Coordinates, opts?: { silent?: boolean }) => {
       const silent = opts?.silent ?? false;
+      const seq = ++fetchSeq.current;
+      fetchedForRef.current = at;
       if (!silent) {
         setIsLoadingBusStops(true);
         setLoadingPhase("fetching");
       }
       try {
         const response = await fetch(
-          `${API_BASE_URL}/getNearestBusStops?lat=${lat}&lng=${lng}`,
+          `${API_BASE_URL}/getNearestBusStops?lat=${at.latitude}&lng=${at.longitude}`,
         );
         if (!response.ok) throw new Error(`Server returned ${response.status}`);
         const data = await response.json();
+        if (seq !== fetchSeq.current) return; // a newer position won
         const now = new Date();
         setNearestBusStops(Array.isArray(data) ? data : []);
         setLastUpdated(now);
@@ -125,6 +130,7 @@ export default function Index() {
         setIsStale(false);
         setError(null);
       } catch (err) {
+        if (seq !== fetchSeq.current) return;
         console.error("Failed to fetch nearest bus stops:", err);
         setError("Couldn't load nearby stops. Pull down to retry.");
       } finally {
@@ -137,186 +143,107 @@ export default function Index() {
     [],
   );
 
-  const requestLocationPermission = useCallback(async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setPermissionDenied(true);
-        setError("Location is off, so we can't find stops near you.");
-        return false;
-      }
-      setPermissionDenied(false);
-      return true;
-    } catch {
-      setError("Couldn't request location permission.");
-      return false;
-    }
-  }, []);
-
-  // A full GPS fix can take seconds, so it runs off the refresh path: the
-  // refresh serves cached coords instantly, and if the real fix lands
-  // somewhere else we silently re-fetch for the new position. alwaysRefetch
-  // is for the explicit Locate button, where the user expects fresh data even
-  // when they haven't moved.
-  const refixLocationInBackground = useCallback(
-    async (opts?: { alwaysRefetch?: boolean }) => {
-      if (gpsRefixInFlight.current) return;
-      gpsRefixInFlight.current = true;
-      setIsRefixingLocation(true);
-      try {
-        const fix = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low,
-        });
-        const coords = {
-          latitude: fix.coords.latitude,
-          longitude: fix.coords.longitude,
-        };
-        const prev = locationRef.current;
-        setLocation(coords);
-        locationRef.current = coords;
-        locationTimeRef.current = Date.now();
-        const moved =
-          !!prev && distanceMeters(prev, coords) > MOVE_THRESHOLD_M;
-        if (moved || opts?.alwaysRefetch) {
-          await fetchNearestBusStops(coords.latitude, coords.longitude, {
-            silent: true,
-          });
-        }
-      } catch {
-        // Keep showing data for the cached position; the next refresh retries.
-      } finally {
-        gpsRefixInFlight.current = false;
-        setIsRefixingLocation(false);
+  // Every watched fix: if the rider has walked away from where the list was
+  // fetched, the nearest stops may have changed, so fetch again (silently).
+  const onFix = useCallback(
+    (fix: Fix) => {
+      const at = fetchedForRef.current;
+      if (at && distanceMeters(at, fix) > REFETCH_MOVE_M) {
+        fetchNearestBusStops(fix, { silent: true });
       }
     },
     [fetchNearestBusStops],
   );
+  const { fix, fixRef, getFreshFix, requestPermission, startWatching } =
+    useLiveLocation(onFix);
 
-  const getCurrentLocation = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
+  /**
+   * initial: cold start, shows skeleton + phase text.
+   * refresh: pull-to-refresh, keeps the list, spinner at the top.
+   * locate / resume: always a new fix (locate) or one under 10 s (resume);
+   *   the list keeps serving while "Updating your location…" shows.
+   */
+  const load = useCallback(
+    async (mode: "initial" | "refresh" | "locate" | "resume") => {
       if (inFlight.current) return;
       inFlight.current = true;
+      const background = mode === "locate" || mode === "resume";
       if (mode === "refresh") setIsRefreshing(true);
-      else setIsLoading(true);
-      // User-initiated loads show which phase they're waiting on (GPS vs
-      // arrivals API). Only the 30s auto-refresh is silent.
-      setLoadingPhase("locating");
-      setError(null);
-
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        inFlight.current = false;
-        setIsLoading(false);
-        setIsRefreshing(false);
-        setLoadingPhase(null);
-        return;
-      }
+      else if (mode === "initial") setIsLoading(true);
+      else setIsRefixingLocation(true);
+      if (!background) setLoadingPhase("locating");
 
       try {
-        // Refresh path: never block a refresh on a full GPS fix. Within the
-        // TTL reuse the cached fix as-is; after that, a movement check against
-        // the OS-cached getLastKnownPositionAsync (cheap, no new fix) extends
-        // its life while the device stays put. When the device moved or the
-        // fix passed the hard age cap, fetch immediately with the best coords
-        // available and get the real fix in the background.
-        if (mode === "refresh" && locationRef.current) {
-          const fixAge = Date.now() - locationTimeRef.current;
-          let coords = locationRef.current;
-          let needsRefix = fixAge >= LOCATION_MAX_AGE_MS;
-          if (fixAge >= LOCATION_TTL_MS) {
-            const lastKnown = await Location.getLastKnownPositionAsync();
-            if (
-              lastKnown &&
-              distanceMeters(coords, lastKnown.coords) > MOVE_THRESHOLD_M
-            ) {
-              coords = {
-                latitude: lastKnown.coords.latitude,
-                longitude: lastKnown.coords.longitude,
-              };
-              setLocation(coords);
-              locationRef.current = coords;
-              needsRefix = true;
-            }
-          }
-          if (needsRefix) refixLocationInBackground();
-          await fetchNearestBusStops(coords.latitude, coords.longitude);
-          return; // finally resets inFlight + flags
+        const granted = await requestPermission();
+        setPermissionDenied(!granted);
+        if (!granted) {
+          setError("Location is off, so we can't find stops near you.");
+          return;
         }
+        startWatching();
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Location timeout")), 10000),
-        );
-        const locationPromise = Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low,
-        });
-        const locationData = await Promise.race([
-          locationPromise,
-          timeoutPromise,
-        ]).catch(async () => Location.getLastKnownPositionAsync());
-
-        if (locationData) {
-          const coords = {
-            latitude: locationData.coords.latitude,
-            longitude: locationData.coords.longitude,
-          };
-          setLocation(coords);
-          locationRef.current = coords;
-          locationTimeRef.current = Date.now();
-          await Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Success,
-          );
-          await fetchNearestBusStops(coords.latitude, coords.longitude);
-        } else {
+        const maxAge =
+          mode === "locate"
+            ? 0
+            : mode === "initial"
+              ? INITIAL_FIX_MAX_AGE_MS
+              : REFRESH_FIX_MAX_AGE_MS;
+        const next = await getFreshFix(maxAge);
+        if (!next) {
           setError("No location available. Check GPS and try again.");
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          if (mode === "initial") {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          }
+          return;
         }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        setError(
-          message === "Location timeout"
-            ? "Location timed out. Try again or check GPS."
-            : "Couldn't get your location.",
-        );
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (mode === "initial") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        await fetchNearestBusStops(next, { silent: background });
+      } catch {
+        setError("Couldn't get your location.");
       } finally {
         inFlight.current = false;
         setIsLoading(false);
         setIsRefreshing(false);
+        setIsRefixingLocation(false);
         setLoadingPhase(null);
       }
     },
-    [requestLocationPermission, fetchNearestBusStops, refixLocationInBackground],
+    [requestPermission, startWatching, getFreshFix, fetchNearestBusStops],
   );
 
-  // Explicit "re-find me": always gets a real GPS fix and refreshes the list
-  // for it, but still off the UI path — cached data stays on screen while the
-  // fix is in flight.
   const handleLocate = () => {
     Haptics.selectionAsync();
-    if (locationRef.current) {
-      refixLocationInBackground({ alwaysRefetch: true });
-    } else {
-      getCurrentLocation("refresh");
-    }
+    load(nearestBusStops.length > 0 ? "locate" : "refresh");
   };
 
   useEffect(() => {
-    getCurrentLocation("initial");
-  }, [getCurrentLocation]);
+    load("initial");
+  }, [load]);
 
-  // Keep timings live while the screen is open, reusing the known location.
+  // Coming back to the app (often after travelling): new fix, new list.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      const updated = lastUpdatedRef.current;
+      if (!updated || Date.now() - updated.getTime() > RESUME_REFRESH_MS) {
+        load("resume");
+      }
+    });
+    return () => sub.remove();
+  }, [load]);
+
+  // Keep timings live while the screen is open, at the latest watched fix.
   useEffect(() => {
     const id = setInterval(() => {
-      if (locationRef.current) {
-        fetchNearestBusStops(
-          locationRef.current.latitude,
-          locationRef.current.longitude,
-          { silent: true },
-        );
+      const latest = fixRef.current ?? fetchedForRef.current;
+      if (latest && !inFlight.current) {
+        fetchNearestBusStops(latest, { silent: true });
       }
     }, AUTO_REFRESH_MS);
     return () => clearInterval(id);
-  }, [fetchNearestBusStops]);
+  }, [fetchNearestBusStops, fixRef]);
 
   useEffect(() => {
     const id = setInterval(
@@ -341,7 +268,7 @@ export default function Index() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => getCurrentLocation("refresh")}
+            onRefresh={() => load("refresh")}
             progressViewOffset={insets.top + space.md}
             tintColor={colors.accent}
             colors={[colors.accent]}
@@ -389,6 +316,9 @@ export default function Index() {
             updatedAt={lastUpdated}
             errored={!!error && nearestBusStops.length > 0}
           />
+        )}
+        {!permissionDenied && !loadingPhase && !isRefixingLocation && (
+          <LocationLine fix={fix} />
         )}
 
         {/* Favourites */}
@@ -463,7 +393,7 @@ export default function Index() {
             <Text style={sharedStyles.stateTextError}>{error}</Text>
             <TouchableOpacity
               style={sharedStyles.primaryButton}
-              onPress={() => getCurrentLocation("refresh")}
+              onPress={() => load("refresh")}
             >
               <Ionicons name="refresh" size={18} color={colors.onAccent} />
               <Text style={sharedStyles.primaryButtonText}>Try again</Text>
@@ -473,7 +403,7 @@ export default function Index() {
 
         {/* Nearby stops (the error state above already covers the
             nothing-loaded failure, so don't also show an empty section) */}
-        {(location || isLoadingBusStops || loadingPhase) &&
+        {(fix || nearestBusStops.length > 0 || isLoadingBusStops || loadingPhase) &&
           !permissionDenied &&
           !(error && nearestBusStops.length === 0) && (
           <View style={sharedStyles.section}>
@@ -494,6 +424,7 @@ export default function Index() {
                     isFavourite={isFavourite(busStop.BusStopCode)}
                     onToggleFavourite={() => toggleFavourite(busStop)}
                     stale={isStale}
+                    from={fix}
                   />
                 ))}
 
@@ -533,6 +464,7 @@ export default function Index() {
                       isFavourite={isFavourite(busStop.BusStopCode)}
                       onToggleFavourite={() => toggleFavourite(busStop)}
                       stale={isStale}
+                      from={fix}
                     />
                   ))}
               </>

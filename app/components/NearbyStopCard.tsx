@@ -4,7 +4,14 @@ import { Text, TouchableOpacity, View } from "react-native";
 import { sharedStyles } from "../styles";
 import { colors } from "../theme";
 import type { BusArrival, NearestBusStop } from "../types";
-import { formatDistance } from "../utils";
+import {
+  bearingDegrees,
+  compassPoint,
+  compassWord,
+  distanceMeters,
+  formatDistance,
+  formatMetres,
+} from "../utils";
 import { BusCard } from "./BusCard";
 
 type NearbyStopCardProps = {
@@ -13,6 +20,12 @@ type NearbyStopCardProps = {
   onToggleFavourite: () => void;
   /** Arrival data is past the stale threshold; dim the timings. */
   stale?: boolean;
+  /**
+   * The rider's current position. With the stop's coordinates it gives a live
+   * distance and compass direction, which is what tells two same-named stops
+   * on opposite sides of a road apart.
+   */
+  from?: { latitude: number; longitude: number } | null;
 };
 
 export function NearbyStopCard({
@@ -20,8 +33,21 @@ export function NearbyStopCard({
   isFavourite,
   onToggleFavourite,
   stale = false,
+  from,
 }: NearbyStopCardProps) {
-  const walkDistance = formatDistance(busStop.Distance);
+  const stopCoords =
+    busStop.Latitude != null && busStop.Longitude != null
+      ? { latitude: busStop.Latitude, longitude: busStop.Longitude }
+      : null;
+  const live = from && stopCoords;
+  const walkDistance = live
+    ? formatMetres(distanceMeters(from, stopCoords))
+    : formatDistance(busStop.Distance);
+  // Under ~10 m a direction is GPS noise: you're at the stop.
+  const direction =
+    live && distanceMeters(from, stopCoords) >= 10
+      ? compassPoint(bearingDegrees(from, stopCoords))
+      : null;
   const router = useRouter();
 
   const openBusRoute = (arrival: BusArrival) => {
@@ -52,14 +78,18 @@ export function NearbyStopCard({
           }
           activeOpacity={0.65}
           accessibilityRole="button"
-          accessibilityLabel={`Open ${busStop.Description}, ${walkDistance} away`}
+          accessibilityLabel={`Open ${busStop.Description}, stop ${busStop.BusStopCode}, ${walkDistance} away${
+            direction ? ` to the ${compassWord(direction)}` : ""
+          }`}
           accessibilityHint="Shows all arrivals at this stop"
         >
           <Text style={sharedStyles.stopName}>{busStop.Description}</Text>
           <View style={sharedStyles.stopMetaRow}>
             <Ionicons name="walk" size={14} color={colors.inkMuted} />
             <Text style={sharedStyles.stopMeta}>
-              {walkDistance} · {busStop.RoadName} · {busStop.BusStopCode}
+              {walkDistance}
+              {direction ? ` ${direction}` : ""} · {busStop.RoadName} ·{" "}
+              <Text style={sharedStyles.stopCode}>{busStop.BusStopCode}</Text>
             </Text>
           </View>
         </TouchableOpacity>

@@ -126,6 +126,13 @@ export const sharedStyles = StyleSheet.create({
     ...type.label,
     color: colors.inkMuted,
   },
+  // The code printed on the stop's pole: the one thing a rider can check
+  // against the street.
+  stopCode: {
+    color: colors.ink,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
 
   // Bus arrival card — the answer surface
   busCard: {
@@ -212,6 +219,11 @@ export const sharedStyles = StyleSheet.create({
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.6,
+  },
+  destination: {
+    ...type.label,
+    color: colors.ink,
+    fontWeight: "600",
   },
   heroImminent: {
     color: colors.accentText,

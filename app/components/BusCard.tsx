@@ -41,6 +41,7 @@ export function BusCard({ arrival, onPress, stale = false }: BusCardProps) {
   const [next, ...rest] = times;
   const nextMins = next != null ? minutesUntil(next) : undefined;
   const imminent = nextMins != null && nextMins <= IMMINENT_MINS;
+  const destination = arrival.DestinationName?.trim();
 
   // The card sets `accessible`, which flattens its children for screen
   // readers, so the label must carry everything sighted users can see:
@@ -82,7 +83,16 @@ export function BusCard({ arrival, onPress, stale = false }: BusCardProps) {
               accessibilityLabel="Wheelchair accessible"
             />
           )}
-          {arrival.Operator ? (
+          {/* Destination tells riders which side of the road this stop
+              serves; the operator is the fallback when LTA gives none. */}
+          {destination ? (
+            <Text
+              style={[sharedStyles.destination, { flexShrink: 1 }]}
+              numberOfLines={1}
+            >
+              → {destination}
+            </Text>
+          ) : arrival.Operator ? (
             <Text
               style={[sharedStyles.operator, { flexShrink: 1 }]}
               numberOfLines={1}
@@ -167,7 +177,7 @@ export function BusCard({ arrival, onPress, stale = false }: BusCardProps) {
         activeOpacity={0.65}
         accessible
         accessibilityRole="button"
-        accessibilityLabel={`Bus ${arrival.ServiceNo}, ${heroSpeech}`}
+        accessibilityLabel={`Bus ${arrival.ServiceNo}${destination ? ` to ${destination}` : ""}, ${heroSpeech}`}
         accessibilityHint="Shows the next stops on this route"
       >
         {content}
@@ -179,7 +189,7 @@ export function BusCard({ arrival, onPress, stale = false }: BusCardProps) {
     <View
       style={sharedStyles.busCard}
       accessible
-      accessibilityLabel={`Bus ${arrival.ServiceNo}, ${heroSpeech}`}
+      accessibilityLabel={`Bus ${arrival.ServiceNo}${destination ? ` to ${destination}` : ""}, ${heroSpeech}`}
     >
       {content}
     </View>
